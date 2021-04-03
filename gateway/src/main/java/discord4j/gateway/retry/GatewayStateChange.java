@@ -36,11 +36,11 @@ public class GatewayStateChange implements Dispatch {
     }
 
     public static ClosingStateChange disconnected(DisconnectBehavior behavior, CloseStatus status) {
-        return new ClosingStateChange(behavior, status);
+        return ClosingStateChange.disconnecting(behavior, status);
     }
 
-    public static GatewayStateChange disconnectedResume() {
-        return new GatewayStateChange(State.DISCONNECTED_RESUME, 0, null);
+    public static ClosingStateChange disconnectedResume(DisconnectBehavior behavior, CloseStatus status) {
+        return ClosingStateChange.resuming(behavior, status);
     }
 
     public static GatewayStateChange retryStarted(Duration nextAttemptBackoff) {

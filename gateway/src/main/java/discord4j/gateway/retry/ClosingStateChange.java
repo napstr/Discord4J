@@ -7,8 +7,16 @@ public class ClosingStateChange extends GatewayStateChange {
     private final DisconnectBehavior behavior;
     private final CloseStatus status;
 
-    protected ClosingStateChange(DisconnectBehavior behavior, CloseStatus status) {
-        super(State.DISCONNECTED, 0, null);
+    protected static ClosingStateChange resuming(DisconnectBehavior behavior, CloseStatus status) {
+        return new ClosingStateChange(State.DISCONNECTED_RESUME, behavior, status);
+    }
+
+    protected static ClosingStateChange disconnecting(DisconnectBehavior behavior, CloseStatus status) {
+        return new ClosingStateChange(State.DISCONNECTED, behavior, status);
+    }
+
+    protected ClosingStateChange(State state, DisconnectBehavior behavior, CloseStatus status) {
+        super(state, 0, null);
         this.behavior = behavior;
         this.status = status;
     }

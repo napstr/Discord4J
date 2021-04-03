@@ -81,18 +81,19 @@ public class DiscordWebClient {
     }
 
     private HttpClient configureHttpClient(HttpClient httpClient) {
-        if (log.isTraceEnabled()) {
-            return httpClient.observe((connection, state) -> {
-                if (connection instanceof ConnectionObserver) {
-                    ConnectionObserver observer = (ConnectionObserver) connection;
+        return httpClient.observe((connection, state) -> {
+            if (connection instanceof ConnectionObserver) {
+                ConnectionObserver observer = (ConnectionObserver) connection;
+                if (log.isTraceEnabled()) {
                     log.trace(format(observer.currentContext(), "{} {}"), state, connection);
-                } else if (connection instanceof HttpClientRequest) {
-                    HttpClientRequest httpClientRequest = (HttpClientRequest) connection;
+                }
+            } else if (connection instanceof HttpClientRequest) {
+                HttpClientRequest httpClientRequest = (HttpClientRequest) connection;
+                if (log.isTraceEnabled()) {
                     log.trace(format(httpClientRequest.currentContextView(), "{} {}"), state, connection);
                 }
-            });
-        }
-        return httpClient;
+            }
+        });
     }
 
     /**

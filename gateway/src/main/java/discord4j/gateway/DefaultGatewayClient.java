@@ -512,7 +512,7 @@ public class DefaultGatewayClient implements GatewayClient {
             heartbeatEmitter.stop();
 
             if (behavior.getAction() == DisconnectBehavior.Action.STOP_ABRUPTLY) {
-                emissionStrategy.emitNext(dispatch, GatewayStateChange.disconnectedResume());
+                emissionStrategy.emitNext(dispatch, GatewayStateChange.disconnectedResume(behavior, closeStatus));
                 notifyObserver(GatewayObserver.DISCONNECTED_RESUME);
             } else if (behavior.getAction() == DisconnectBehavior.Action.STOP) {
                 emissionStrategy.emitNext(dispatch, GatewayStateChange.disconnected(sourceBehavior, closeStatus));
