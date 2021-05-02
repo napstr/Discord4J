@@ -16,6 +16,7 @@
  */
 package discord4j.rest.request;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import discord4j.common.ReactorResources;
 import discord4j.rest.http.client.ClientResponse;
 import discord4j.rest.http.client.DiscordWebClient;
@@ -24,8 +25,7 @@ import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Objects;
 
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 
@@ -40,7 +40,7 @@ public class DefaultRouter implements Router {
 
     private final ReactorResources reactorResources;
     private final DiscordWebClient httpClient;
-    private final Map<BucketKey, RequestStream> streamMap = new ConcurrentHashMap<>();
+    private final Cache<BucketKey, RequestStream> streamMap;
     private final RouterOptions routerOptions;
 
     /**
@@ -54,6 +54,7 @@ public class DefaultRouter implements Router {
         this.httpClient = new DiscordWebClient(reactorResources.getHttpClient(),
                 routerOptions.getExchangeStrategies(), "Bot", routerOptions.getToken(),
                 routerOptions.getResponseTransformers(), routerOptions.getDiscordBaseUrl());
+        this.streamMap = routerOptions.getCacheFactory().createRequestStreamCache();
     }
 
     @Override
@@ -71,7 +72,7 @@ public class DefaultRouter implements Router {
     }
 
     private RequestStream getStream(DiscordWebRequest request) {
-        return streamMap.computeIfAbsent(BucketKey.of(request),
+        return Objects.requireNonNull(streamMap.get(BucketKey.of(request),
                 k -> {
                     if (log.isTraceEnabled()) {
                         log.trace("Creating RequestStream with key {} for request: {} -> {}",
@@ -80,6 +81,6 @@ public class DefaultRouter implements Router {
                     RequestStream stream = new RequestStream(k, routerOptions, httpClient, HEADER_STRATEGY);
                     stream.start();
                     return stream;
-                });
+                }));
     }
 }

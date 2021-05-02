@@ -20,6 +20,7 @@ package discord4j.rest.request;
 import discord4j.common.ReactorResources;
 import discord4j.rest.http.ExchangeStrategies;
 import discord4j.rest.response.ResponseFunction;
+import discord4j.rest.util.CacheFactory;
 
 import java.util.List;
 import java.util.Objects;
@@ -36,10 +37,11 @@ public class RouterOptions {
     private final GlobalRateLimiter globalRateLimiter;
     private final RequestQueueFactory requestQueueFactory;
     private final String discordBaseUrl;
+    private final CacheFactory cacheFactory;
 
     public RouterOptions(String token, ReactorResources reactorResources, ExchangeStrategies exchangeStrategies,
                          List<ResponseFunction> responseTransformers, GlobalRateLimiter globalRateLimiter,
-                         RequestQueueFactory requestQueueFactory, String discordBaseUrl) {
+                         RequestQueueFactory requestQueueFactory, String discordBaseUrl, CacheFactory cacheFactory) {
         this.token = Objects.requireNonNull(token, "token");
         this.reactorResources = Objects.requireNonNull(reactorResources, "reactorResources");
         this.exchangeStrategies = Objects.requireNonNull(exchangeStrategies, "exchangeStrategies");
@@ -47,6 +49,7 @@ public class RouterOptions {
         this.globalRateLimiter = Objects.requireNonNull(globalRateLimiter, "globalRateLimiter");
         this.requestQueueFactory = Objects.requireNonNull(requestQueueFactory, "requestQueueFactory");
         this.discordBaseUrl = Objects.requireNonNull(discordBaseUrl, "discordBaseUrl");
+        this.cacheFactory = Objects.requireNonNull(cacheFactory, "cacheFactory");
     }
 
     /**
@@ -111,5 +114,14 @@ public class RouterOptions {
      */
     public String getDiscordBaseUrl() {
         return discordBaseUrl;
+    }
+
+    /**
+     * Returns the {@link CacheFactory} to use for instantiating caches.
+     *
+     * @return the configured {@link CacheFactory}
+     */
+    public CacheFactory getCacheFactory() {
+        return cacheFactory;
     }
 }

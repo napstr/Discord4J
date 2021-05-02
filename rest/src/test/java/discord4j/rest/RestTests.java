@@ -22,6 +22,7 @@ import discord4j.common.ReactorResources;
 import discord4j.rest.http.ExchangeStrategies;
 import discord4j.rest.request.*;
 import discord4j.rest.route.Routes;
+import discord4j.rest.util.DefaultCacheFactory;
 
 import java.util.Collections;
 import java.util.Objects;
@@ -41,6 +42,6 @@ public abstract class RestTests {
         return new DefaultRouter(new RouterOptions(token, ReactorResources.create(),
                 ExchangeStrategies.jackson(JacksonResources.create().getObjectMapper()),
                 Collections.emptyList(), BucketGlobalRateLimiter.create(), RequestQueueFactory.buffering(),
-                Routes.BASE_URL));
+                Routes.BASE_URL, new DefaultCacheFactory()));
     }
 }
