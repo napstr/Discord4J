@@ -267,6 +267,7 @@ public class DefaultGatewayClient implements GatewayClient {
                             .map(buf -> unpooled ? buf : buf.retain())
                             .doOnNext(buf -> logPayload(receiverLog, context, buf))
                             .flatMap(payloadReader::read)
+                            .publishOn(reactorResources.getPublishScheduler())
                             .doOnDiscard(ByteBuf.class, DefaultGatewayClient::safeRelease)
                             .doOnNext(payload -> {
                                 if (Opcode.HEARTBEAT_ACK.equals(payload.getOp())) {

@@ -33,8 +33,11 @@ public class GatewayReactorResources extends ReactorResources {
 
     public static final Supplier<Scheduler> DEFAULT_PAYLOAD_SENDER_SCHEDULER = () ->
             Schedulers.newSingle("d4j-gateway", true);
+    public static final Supplier<Scheduler> DEFAULT_PUBLISH_SCHEDULER = () ->
+            Schedulers.newParallel("d4j-gateway-publish");
 
     private final Scheduler payloadSenderScheduler;
+    private final Scheduler publishScheduler;
 
     /**
      * Create Gateway resources based off {@link ReactorResources} properties, and providing defaults for the
@@ -45,6 +48,7 @@ public class GatewayReactorResources extends ReactorResources {
     public GatewayReactorResources(ReactorResources parent) {
         super(parent.getHttpClient(), parent.getTimerTaskScheduler(), parent.getBlockingTaskScheduler());
         this.payloadSenderScheduler = DEFAULT_PAYLOAD_SENDER_SCHEDULER.get();
+        this.publishScheduler = DEFAULT_PUBLISH_SCHEDULER.get();
     }
 
     /**
@@ -58,6 +62,7 @@ public class GatewayReactorResources extends ReactorResources {
     public GatewayReactorResources(ReactorResources parent, Scheduler payloadSenderScheduler) {
         super(parent.getHttpClient(), parent.getTimerTaskScheduler(), parent.getBlockingTaskScheduler());
         this.payloadSenderScheduler = payloadSenderScheduler;
+        this.publishScheduler = DEFAULT_PUBLISH_SCHEDULER.get(); // TODO: add to parameters for 3.3
     }
 
     /**
@@ -76,6 +81,7 @@ public class GatewayReactorResources extends ReactorResources {
                                    Scheduler blockingTaskScheduler, Scheduler payloadSenderScheduler) {
         super(httpClient, timerTaskScheduler, blockingTaskScheduler);
         this.payloadSenderScheduler = payloadSenderScheduler;
+        this.publishScheduler = DEFAULT_PUBLISH_SCHEDULER.get(); // TODO: add to parameters for 3.3
     }
 
     protected GatewayReactorResources(Builder builder) {
@@ -83,6 +89,8 @@ public class GatewayReactorResources extends ReactorResources {
 
         this.payloadSenderScheduler = builder.payloadSenderScheduler == null ?
                 DEFAULT_PAYLOAD_SENDER_SCHEDULER.get() : builder.payloadSenderScheduler;
+        this.publishScheduler = builder.publishScheduler == null ?
+                DEFAULT_PUBLISH_SCHEDULER.get() : builder.publishScheduler;
     }
 
     /**
@@ -140,11 +148,21 @@ public class GatewayReactorResources extends ReactorResources {
     }
 
     /**
+     * Get the scheduler used for publishing gateway payloads.
+     *
+     * @return a scheduler for payload publishing
+     */
+    public Scheduler getPublishScheduler() {
+        return publishScheduler;
+    }
+
+    /**
      * Builder for {@link GatewayReactorResources}.
      */
     public static class Builder extends ReactorResources.Builder {
 
         private Scheduler payloadSenderScheduler;
+        private Scheduler publishScheduler;
 
         protected Builder() {
         }
@@ -158,6 +176,18 @@ public class GatewayReactorResources extends ReactorResources {
          */
         public Builder payloadSenderScheduler(Scheduler payloadSenderScheduler) {
             this.payloadSenderScheduler = payloadSenderScheduler;
+            return this;
+        }
+
+        /**
+         * Set the {@link Scheduler} used for publishing received Gateway payloads. A default can be created from
+         * {@link GatewayReactorResources#DEFAULT_PUBLISH_SCHEDULER}.
+         *
+         * @param publishScheduler a scheduler for publishing received gateway payloads
+         * @return this builder
+         */
+        public Builder publishScheduler(Scheduler publishScheduler) {
+            this.publishScheduler = publishScheduler;
             return this;
         }
 
@@ -184,6 +214,7 @@ public class GatewayReactorResources extends ReactorResources {
          *
          * @return a new instance of {@link GatewayReactorResources}
          */
+        @Override
         public GatewayReactorResources build() {
             return new GatewayReactorResources(this);
         }
