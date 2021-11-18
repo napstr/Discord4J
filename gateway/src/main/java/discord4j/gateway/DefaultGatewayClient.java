@@ -237,7 +237,7 @@ public class DefaultGatewayClient implements GatewayClient {
                             .doOnNext(buf -> logPayload(senderLog, context, buf))
                             .doOnDiscard(ByteBuf.class, DefaultGatewayClient::safeRelease);
 
-                    sessionHandler = new GatewayWebsocketHandler(receiver, outFlux, context);
+                    sessionHandler = new GatewayWebsocketHandler(receiver, outFlux, context, unpooled);
 
                     Mono<Void> readyHandler = dispatch.asFlux()
                             .filter(DefaultGatewayClient::isReadyOrResumed)
