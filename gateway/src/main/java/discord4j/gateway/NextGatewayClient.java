@@ -409,8 +409,13 @@ public class NextGatewayClient implements GatewayClient {
         Mono<Void> inboundEvents = in.aggregateFrames()
                 .receiveFrames()
                 .map(WebSocketFrame::content)
-                .transformDeferred(decompressor::completeMessages)
-                .doOnNext(buf -> logPayload(receiverLog, currentContext, buf))
+                .map(buf -> {
+                    buf.touch("Retain websocket frame");
+                    return buf.retain();
+                })
+                .publishOn(reactorResources.getDispatchEmitScheduler())
+                .transform(decompressor::completeMessages)
+                .doOnNext(data -> logPayload(receiverLog, currentContext, data))
                 .transform(payloadReader::decode)
                 .flatMap(payload -> {
                     if (Opcode.HEARTBEAT_ACK.equals(payload.getOp())) {

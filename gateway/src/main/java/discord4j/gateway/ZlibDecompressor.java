@@ -50,7 +50,8 @@ public class ZlibDecompressor {
 
     public Flux<ByteBuf> completeMessages(Flux<ByteBuf> payloads) {
         return payloads.windowUntil(windowPredicate)
-                .flatMap(Flux::collectList)
+                // Inflater needs to run sequentially, and not concurrently, so concatMap is important here
+                .concatMap(Flux::collectList)
                 .map(list -> {
                     final ByteBuf buf;
                     if (list.size() == 1) {
@@ -69,6 +70,9 @@ public class ZlibDecompressor {
                         return outBuffer.writeBytes(out.toByteArray()).asReadOnly();
                     } catch (IOException e) {
                         throw Exceptions.propagate(e);
+                    } finally {
+                        buf.touch("Decompressor release");
+                        buf.release();
                     }
                 });
     }
