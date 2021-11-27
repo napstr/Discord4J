@@ -25,13 +25,17 @@ import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Consumer;
+import java.util.function.Function;
+
+import static reactor.function.TupleUtils.function;
 
 public class GatewayRetrySpec extends Retry {
 
@@ -44,25 +48,29 @@ public class GatewayRetrySpec extends Retry {
             4014 // Disallowed intent(s)
     );
 
-    private static final Consumer<GatewayRetrySignal> NO_OP_CONSUMER = retrySignal -> {};
+    private static final Function<GatewayRetrySignal, Mono<Void>> NO_OP_CONSUMER = retrySignal -> Mono.empty();
 
     private final ReconnectOptions reconnectOptions;
     private final ReconnectContext reconnectContext;
-    private final Consumer<GatewayRetrySignal> doPreRetry;
+    private final Function<GatewayRetrySignal, Tuple2<GatewayRetrySignal, Mono<Void>>> doPreRetry;
 
     GatewayRetrySpec(ReconnectOptions reconnectOptions, ReconnectContext reconnectContext,
-                     Consumer<GatewayRetrySignal> doPreRetry) {
+                     Function<GatewayRetrySignal, Mono<Void>> doPreRetry) {
         this.reconnectOptions = reconnectOptions;
         this.reconnectContext = reconnectContext;
-        this.doPreRetry = doPreRetry;
+        this.doPreRetry = signal -> Tuples.of(signal, doPreRetry.apply(signal));
     }
 
     public static GatewayRetrySpec create(ReconnectOptions reconnectOptions, ReconnectContext reconnectContext) {
         return new GatewayRetrySpec(reconnectOptions, reconnectContext, NO_OP_CONSUMER);
     }
 
-    public GatewayRetrySpec doBeforeRetry(Consumer<GatewayRetrySignal> doBeforeRetry) {
-        return new GatewayRetrySpec(reconnectOptions, reconnectContext, doPreRetry.andThen(doBeforeRetry));
+    public GatewayRetrySpec doBeforeRetry(Function<GatewayRetrySignal, Mono<Void>> doBeforeRetry) {
+        return new GatewayRetrySpec(reconnectOptions, reconnectContext,
+                doPreRetry.andThen(function((signal, mono) ->
+                        mono.then(doBeforeRetry.apply(signal))
+                ))
+        );
     }
 
     private boolean isRetryable(@Nullable Throwable t) {
@@ -191,15 +199,15 @@ public class GatewayRetrySpec extends Retry {
 
     static <T> Mono<T> applyHooks(GatewayRetrySignal retrySignal,
                                   Mono<T> originalCompanion,
-                                  final Consumer<GatewayRetrySignal> doPreRetry) {
-        if (doPreRetry != NO_OP_CONSUMER) {
-            try {
-                doPreRetry.accept(retrySignal);
-            } catch (Throwable e) {
-                return Mono.error(e);
-            }
+                                  final Function<GatewayRetrySignal, Tuple2<GatewayRetrySignal, Mono<Void>>> doPreRetry) {
+
+        Mono<Void> preRetry;
+        try {
+            preRetry = doPreRetry.apply(retrySignal).getT2();
+        } catch (Throwable e) {
+            return Mono.error(e);
         }
-        return originalCompanion;
+        return preRetry.then(originalCompanion);
     }
 
 }

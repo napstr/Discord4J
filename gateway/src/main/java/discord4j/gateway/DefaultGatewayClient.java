@@ -505,6 +505,7 @@ public class DefaultGatewayClient implements GatewayClient {
                     if (retry.nextState() == GatewayConnection.State.RECONNECTING) {
                         emissionStrategy.emitNext(dispatch, GatewayStateChange.sessionInvalidated());
                     }
+                    return Mono.empty();
                 });
     }
 

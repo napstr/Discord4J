@@ -43,6 +43,8 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.ConnectionObserver;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.client.WebsocketClientSpec;
@@ -70,7 +72,7 @@ import java.util.function.Function;
 import static discord4j.common.LogUtil.format;
 import static io.netty.handler.codec.http.HttpHeaderNames.USER_AGENT;
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
-import static reactor.function.TupleUtils.consumer;
+import static reactor.function.TupleUtils.function;
 
 /**
  * Represents a Discord WebSocket client, called Gateway, implementing its lifecycle.
@@ -251,23 +253,24 @@ public class NextGatewayClient implements GatewayClient {
                     Mono<Void> readyHandler = dispatch()
                             .filter(NextGatewayClient::isReadyOrResumed)
                             .zipWith(state.asFlux().next().repeat())
-                            .doOnNext(consumer((event, currentState) -> {
+                            .flatMap(function((event, currentState) -> {
                                 ConnectionObserver.State observerState;
+                                Mono<Void> emit;
                                 if (currentState == GatewayConnection.State.START_IDENTIFYING
                                         || currentState == GatewayConnection.State.START_RESUMING) {
                                     log.info(format(context, "Connected to Gateway"));
-                                    emissionStrategy.emitNext(dispatch, GatewayStateChange.connected());
+                                    emit = emitNext(emissionStrategy, dispatch, GatewayStateChange.connected());
                                     observerState = GatewayObserver.CONNECTED;
                                 } else {
                                     log.info(format(context, "Reconnected to Gateway"));
-                                    emissionStrategy.emitNext(dispatch,
-                                            GatewayStateChange.retrySucceeded(reconnectContext.getAttempts()));
+                                    emit = emitNext(emissionStrategy, dispatch, GatewayStateChange.retrySucceeded(reconnectContext.getAttempts()));
                                     observerState = GatewayObserver.RETRY_SUCCEEDED;
                                 }
 
                                 reconnectContext.reset();
                                 state.emitNext(GatewayConnection.State.CONNECTED, FAIL_FAST);
                                 notifyObserver(observerState);
+                                return emit;
                             }))
                             .then();
 
@@ -352,6 +355,13 @@ public class NextGatewayClient implements GatewayClient {
                         throw new IllegalStateException("execute can only be subscribed once");
                     }
                 });
+    }
+
+    private final Scheduler emitter = Schedulers.newBoundedElastic(100, 10_000, "d4j-gw-emitter");
+
+    private <T> Mono<Void> emitNext(EmissionStrategy emissionStrategy, Sinks.Many<T> sink, T element) {
+        return Mono.<Void>fromRunnable(() -> emissionStrategy.emitNext(sink, element))
+                .subscribeOn(emitter);
     }
 
     public void closeSession(DisconnectBehavior behavior) {
@@ -491,7 +501,7 @@ public class NextGatewayClient implements GatewayClient {
             sessionId.set(newSessionId);
         }
         if (payload.getData() != null) {
-            emissionStrategy.emitNext(dispatch, payload.getData());
+            return emitNext(emissionStrategy, dispatch, payload.getData());
         }
         return Mono.empty();
     }
@@ -572,21 +582,23 @@ public class NextGatewayClient implements GatewayClient {
                     Duration backoff = retry.nextBackoff();
                     log.debug(format(getContextFromException(retry.failure()),
                             "{} in {} (attempts: {})"), retry.nextState(), backoff, attempt);
+                    Mono<Void> emit;
                     if (retry.iteration() == 1) {
                         if (retry.nextState() == GatewayConnection.State.RESUMING) {
-                            emissionStrategy.emitNext(dispatch, GatewayStateChange.retryStarted(backoff));
+                            emit = emitNext(emissionStrategy, dispatch, GatewayStateChange.retryStarted(backoff));
                             notifyObserver(GatewayObserver.RETRY_STARTED);
                         } else {
-                            emissionStrategy.emitNext(dispatch, GatewayStateChange.retryStartedResume(backoff));
+                            emit = emitNext(emissionStrategy, dispatch, GatewayStateChange.retryStartedResume(backoff));
                             notifyObserver(GatewayObserver.RETRY_RESUME_STARTED);
                         }
                     } else {
-                        emissionStrategy.emitNext(dispatch, GatewayStateChange.retryFailed(attempt - 1, backoff));
+                        emit = emitNext(emissionStrategy, dispatch, GatewayStateChange.retryFailed(attempt - 1, backoff));
                         notifyObserver(GatewayObserver.RETRY_FAILED);
                     }
                     if (retry.nextState() == GatewayConnection.State.RECONNECTING) {
-                        emissionStrategy.emitNext(dispatch, GatewayStateChange.sessionInvalidated());
+                        emit = emit.then(emitNext(emissionStrategy, dispatch, GatewayStateChange.sessionInvalidated()));
                     }
+                    return emit;
                 });
     }
 
