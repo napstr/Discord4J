@@ -43,8 +43,6 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
 import reactor.netty.ConnectionObserver;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.client.WebsocketClientSpec;
@@ -357,11 +355,9 @@ public class NextGatewayClient implements GatewayClient {
                 });
     }
 
-    private final Scheduler emitter = Schedulers.newBoundedElastic(100, 10_000, "d4j-gw-emitter");
-
     private <T> Mono<Void> emitNext(EmissionStrategy emissionStrategy, Sinks.Many<T> sink, T element) {
         return Mono.<Void>fromRunnable(() -> emissionStrategy.emitNext(sink, element))
-                .subscribeOn(emitter);
+                .subscribeOn(reactorResources.getDispatchEmitScheduler());
     }
 
     public void closeSession(DisconnectBehavior behavior) {

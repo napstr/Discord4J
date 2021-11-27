@@ -33,8 +33,10 @@ public class GatewayReactorResources extends ReactorResources {
 
     public static final Supplier<Scheduler> DEFAULT_PAYLOAD_SENDER_SCHEDULER = () ->
             Schedulers.newSingle("d4j-gateway", true);
-
+    public static final Supplier<Scheduler> DEFAULT_DISPATCH_EMIT_SCHEDULER = () ->
+            Schedulers.newBoundedElastic(100, 10_000, "d4j-gw-emitter");
     private final Scheduler payloadSenderScheduler;
+    private final Scheduler dispatchEmitScheduler;
 
     /**
      * Create Gateway resources based off {@link ReactorResources} properties, and providing defaults for the
@@ -45,6 +47,7 @@ public class GatewayReactorResources extends ReactorResources {
     public GatewayReactorResources(ReactorResources parent) {
         super(parent.getHttpClient(), parent.getTimerTaskScheduler(), parent.getBlockingTaskScheduler());
         this.payloadSenderScheduler = DEFAULT_PAYLOAD_SENDER_SCHEDULER.get();
+        this.dispatchEmitScheduler = DEFAULT_DISPATCH_EMIT_SCHEDULER.get();
     }
 
     /**
@@ -58,6 +61,7 @@ public class GatewayReactorResources extends ReactorResources {
     public GatewayReactorResources(ReactorResources parent, Scheduler payloadSenderScheduler) {
         super(parent.getHttpClient(), parent.getTimerTaskScheduler(), parent.getBlockingTaskScheduler());
         this.payloadSenderScheduler = payloadSenderScheduler;
+        this.dispatchEmitScheduler = DEFAULT_DISPATCH_EMIT_SCHEDULER.get(); // TODO param
     }
 
     /**
@@ -76,6 +80,7 @@ public class GatewayReactorResources extends ReactorResources {
                                    Scheduler blockingTaskScheduler, Scheduler payloadSenderScheduler) {
         super(httpClient, timerTaskScheduler, blockingTaskScheduler);
         this.payloadSenderScheduler = payloadSenderScheduler;
+        this.dispatchEmitScheduler = DEFAULT_DISPATCH_EMIT_SCHEDULER.get(); // TODO param
     }
 
     protected GatewayReactorResources(Builder builder) {
@@ -83,6 +88,8 @@ public class GatewayReactorResources extends ReactorResources {
 
         this.payloadSenderScheduler = builder.payloadSenderScheduler == null ?
                 DEFAULT_PAYLOAD_SENDER_SCHEDULER.get() : builder.payloadSenderScheduler;
+        this.dispatchEmitScheduler = builder.dispatchEmitScheduler == null ?
+                DEFAULT_DISPATCH_EMIT_SCHEDULER.get() : builder.dispatchEmitScheduler;
     }
 
     /**
@@ -140,11 +147,19 @@ public class GatewayReactorResources extends ReactorResources {
     }
 
     /**
+     * TODO
+     */
+    public Scheduler getDispatchEmitScheduler() {
+        return dispatchEmitScheduler;
+    }
+
+    /**
      * Builder for {@link GatewayReactorResources}.
      */
     public static class Builder extends ReactorResources.Builder {
 
         private Scheduler payloadSenderScheduler;
+        private Scheduler dispatchEmitScheduler;
 
         protected Builder() {
         }
@@ -158,6 +173,14 @@ public class GatewayReactorResources extends ReactorResources {
          */
         public Builder payloadSenderScheduler(Scheduler payloadSenderScheduler) {
             this.payloadSenderScheduler = payloadSenderScheduler;
+            return this;
+        }
+
+        /**
+         * TODO
+         */
+        public Builder dispatchEmitScheduler(Scheduler dispatchEmitScheduler) {
+            this.dispatchEmitScheduler = dispatchEmitScheduler;
             return this;
         }
 
@@ -184,6 +207,7 @@ public class GatewayReactorResources extends ReactorResources {
          *
          * @return a new instance of {@link GatewayReactorResources}
          */
+        @Override
         public GatewayReactorResources build() {
             return new GatewayReactorResources(this);
         }
