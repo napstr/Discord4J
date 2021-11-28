@@ -413,7 +413,6 @@ public class NextGatewayClient implements GatewayClient {
                     buf.touch("Retain websocket frame");
                     return buf.retain();
                 })
-                .publishOn(reactorResources.getDispatchEmitScheduler())
                 .transform(decompressor::completeMessages)
                 .doOnNext(data -> logPayload(receiverLog, currentContext, data))
                 .transform(payloadReader::decode)
