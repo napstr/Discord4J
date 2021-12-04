@@ -458,6 +458,10 @@ public class NextGatewayClient implements GatewayClient {
         Flux<ByteBuf> inboundDataStream = in.aggregateFrames()
                 .receiveFrames()
                 .map(WebSocketFrame::content)
+                .map(buf -> {
+                    buf.touch("Retain websocket frame");
+                    return buf.retain();
+                })
                 .transform(decompressor::completeMessages)
                 .limitRate(framePrefetch)
                 .share();
